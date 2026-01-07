@@ -29,21 +29,17 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
+      - name: Prepare deployment files
+        run: |
+          mkdir -p deploy
+          cp ggb_converter.html deploy/
+          # 创建 index.html 重定向到主页面
+          cp ggb_converter.html deploy/index.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
-          exclude-paths: |
-            .git
-            .github
-            README.md
-            *.py
-            *.ggb
-            *.csv
-            **/__pycache__
-            **/*.pyc
-            .gitignore
-            2/
+          path: './deploy'
 
       - name: Deploy to GitHub Pages
         id: deployment
