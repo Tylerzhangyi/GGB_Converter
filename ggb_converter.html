@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoGebra 点数据提取工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9ff;
+            margin-bottom: 20px;
+        }
+
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f0f2ff;
+        }
+
+        .upload-area.dragover {
+            border-color: #764ba2;
+            background: #e8ebff;
+            transform: scale(1.02);
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .upload-text {
+            color: #667eea;
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .upload-hint {
+            color: #999;
+            font-size: 12px;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        .file-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f0f2ff;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .file-info.show {
+            display: block;
+        }
+
+        .file-name {
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .file-size {
+            color: #666;
+            font-size: 12px;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn.show {
+            display: block;
+        }
+
+        .result-area {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9ff;
+            border-radius: 10px;
+            display: none;
+            overflow: visible;
+        }
+
+        .result-area.show {
+            display: block;
+        }
+
+        .result-title {
+            color: #333;
+            font-weight: 500;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .result-info {
+            color: #666;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        .points-preview {
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .download-btn {
+            background: #28a745;
+            display: block !important;
+            margin-top: 20px;
+        }
+
+        .download-btn:hover {
+            background: #218838;
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .error {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fee;
+            border: 1px solid #fcc;
+            border-radius: 10px;
+            color: #c33;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📐 GeoGebra 点数据提取工具</h1>
+        <p class="subtitle">从 .ggb 文件中提取点的名称和坐标</p>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <div class="upload-text">点击选择文件或拖拽文件到此处</div>
+            <div class="upload-hint">支持 .ggb 格式文件</div>
+            <input type="file" id="fileInput" accept=".ggb">
+        </div>
+
+        <div class="file-info" id="fileInfo">
+            <div class="file-name" id="fileName"></div>
+            <div class="file-size" id="fileSize"></div>
+        </div>
+
+        <button class="btn" id="convertBtn">开始转换</button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div class="loading-text">正在处理文件...</div>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result-area" id="resultArea">
+            <div class="result-title">✅ 转换成功！</div>
+            <div class="result-info" id="resultInfo"></div>
+            <div class="points-preview" id="pointsPreview"></div>
+            <button class="btn download-btn" id="downloadBtn">下载 CSV 文件</button>
+        </div>
+    </div>
+
+    <script>
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const convertBtn = document.getElementById('convertBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const resultArea = document.getElementById('resultArea');
+        const resultInfo = document.getElementById('resultInfo');
+        const pointsPreview = document.getElementById('pointsPreview');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        let selectedFile = null;
+        let extractedPoints = [];
+
+        // 点击上传区域选择文件
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        // 文件选择
+        fileInput.addEventListener('change', (e) => {
+            handleFile(e.target.files[0]);
+        });
+
+        // 拖拽上传
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        // 处理文件
+        function handleFile(file) {
+            if (!file) return;
+
+            if (!file.name.endsWith('.ggb')) {
+                showError('请选择 .ggb 格式的文件');
+                return;
+            }
+
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.classList.add('show');
+            convertBtn.classList.add('show');
+            error.classList.remove('show');
+            resultArea.classList.remove('show');
+        }
+
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // 显示错误
+        function showError(message) {
+            error.textContent = message;
+            error.classList.add('show');
+        }
+
+        // 转换按钮点击
+        convertBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            convertBtn.disabled = true;
+            loading.classList.add('show');
+            error.classList.remove('show');
+            resultArea.classList.remove('show');
+
+            try {
+                extractedPoints = await extractPointsFromGGB(selectedFile);
+                
+                if (extractedPoints.length === 0) {
+                    showError('未找到任何点数据');
+                    convertBtn.disabled = false;
+                    loading.classList.remove('show');
+                    return;
+                }
+
+                // 显示结果
+                resultInfo.textContent = `成功提取 ${extractedPoints.length} 个点`;
+                showPointsPreview(extractedPoints);
+                resultArea.classList.add('show');
+                convertBtn.disabled = false;
+                loading.classList.remove('show');
+            } catch (err) {
+                showError('转换失败: ' + err.message);
+                convertBtn.disabled = false;
+                loading.classList.remove('show');
+            }
+        });
+
+        // 从GGB文件提取点
+        async function extractPointsFromGGB(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = async function(e) {
+                    try {
+                        // 使用JSZip解压文件
+                        const zip = await JSZip.loadAsync(e.target.result);
+                        
+                        // 读取geogebra.xml
+                        const xmlFile = zip.file('geogebra.xml');
+                        if (!xmlFile) {
+                            reject(new Error('ZIP文件中找不到geogebra.xml文件'));
+                            return;
+                        }
+
+                        const xmlContent = await xmlFile.async('string');
+                        
+                        // 解析XML
+                        const parser = new DOMParser();
+                        const xmlDoc = parser.parseFromString(xmlContent, 'text/xml');
+                        
+                        // 检查解析错误
+                        const parseError = xmlDoc.querySelector('parsererror');
+                        if (parseError) {
+                            reject(new Error('XML解析失败'));
+                            return;
+                        }
+
+                        // 查找所有点元素
+                        const pointElements = xmlDoc.querySelectorAll('element[type="point"]');
+                        const points = [];
+
+                        pointElements.forEach(pointElement => {
+                            const label = pointElement.getAttribute('label') || '';
+                            const coords = pointElement.querySelector('coords');
+                            
+                            if (coords) {
+                                const x = coords.getAttribute('x');
+                                const y = coords.getAttribute('y');
+                                
+                                if (x && y && x !== '' && y !== '') {
+                                    try {
+                                        const xFloat = parseFloat(x);
+                                        const yFloat = parseFloat(y);
+                                        
+                                        if (!isNaN(xFloat) && !isNaN(yFloat)) {
+                                            points.push({
+                                                '点名称': label,
+                                                'x': xFloat,
+                                                'y': yFloat
+                                            });
+                                        }
+                                    } catch (err) {
+                                        // 跳过无效坐标
+                                    }
+                                }
+                            }
+                        });
+
+                        resolve(points);
+                    } catch (err) {
+                        reject(err);
+                    }
+                };
+
+                reader.onerror = () => {
+                    reject(new Error('文件读取失败'));
+                };
+
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // 显示点预览
+        function showPointsPreview(points) {
+            const preview = points.slice(0, 10).map(p => 
+                `${p['点名称']}: (${p.x}, ${p.y})`
+            ).join('\n');
+            
+            if (points.length > 10) {
+                pointsPreview.textContent = preview + `\n\n... 还有 ${points.length - 10} 个点`;
+            } else {
+                pointsPreview.textContent = preview;
+            }
+        }
+
+        // 下载CSV
+        downloadBtn.addEventListener('click', () => {
+            if (extractedPoints.length === 0) return;
+
+            // 生成CSV内容
+            const headers = ['点名称', 'x', 'y'];
+            const csvRows = [headers.join(',')];
+            
+            extractedPoints.forEach(point => {
+                const row = [
+                    point['点名称'],
+                    point.x,
+                    point.y
+                ];
+                csvRows.push(row.join(','));
+            });
+
+            const csvContent = '\uFEFF' + csvRows.join('\n'); // 添加BOM以支持Excel中文
+
+            // 创建下载链接
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // 使用原文件名生成下载文件名
+            const originalName = selectedFile.name.replace('.ggb', '');
+            link.download = `${originalName}_points.csv`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
+
